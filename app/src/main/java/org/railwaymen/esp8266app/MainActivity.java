@@ -10,11 +10,17 @@ import android.widget.Toast;
 import com.flask.colorpicker.ColorPickerView;
 import com.flask.colorpicker.OnColorSelectedListener;
 
-public class MainActivity extends AppCompatActivity {
+import rx.Subscription;
+
+public class MainActivity extends AppCompatActivity implements OnLedChangedListener {
 
     private ColorPickerView colorPicker;
     private Button turnOnButton;
     private Button turnOffButton;
+
+    private Subscription onSubscription;
+    private Subscription offSubscription;
+    private Subscription colorSubscription;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,17 +35,14 @@ public class MainActivity extends AppCompatActivity {
         turnOnButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                turnOnButton.setEnabled(false);
-                turnOffButton.setEnabled(true);
+                onSubscription = EspService.getInstance().turnLightOn(MainActivity.this);
             }
         });
         turnOffButton = (Button) findViewById(R.id.turn_off_button);
         turnOffButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                turnOnButton.setEnabled(true);
-                turnOffButton.setEnabled(false);
-                colorPicker.setColor(-1, false);
+                offSubscription = EspService.getInstance().turnLightOff(MainActivity.this);
             }
         });
 
@@ -52,12 +55,44 @@ public class MainActivity extends AppCompatActivity {
                     int red = Color.red(color);
                     int green = Color.green(color);
                     int blue = Color.blue(color);
-                    Toast.makeText(MainActivity.this, "LED turned on", Toast.LENGTH_SHORT).show();
+                    colorSubscription = EspService.getInstance().setLightColor(red, green, blue, MainActivity.this);
                 } else {
                     Toast.makeText(MainActivity.this, "LED turned off", Toast.LENGTH_SHORT).show();
                     colorPicker.setColor(-1, false);
                 }
             }
         });
+    }
+
+    @Override
+    public void onLedOn() {
+        turnOnButton.setEnabled(false);
+        turnOffButton.setEnabled(true);
+    }
+
+    @Override
+    public void onLedOff() {
+        turnOnButton.setEnabled(true);
+        turnOffButton.setEnabled(false);
+        colorPicker.setColor(-1, false);
+    }
+
+    @Override
+    public void onErrorOccurred() {
+        Toast.makeText(this, "Error occurred", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+
+        if (onSubscription != null)
+            onSubscription.unsubscribe();
+
+        if (offSubscription != null)
+            offSubscription.unsubscribe();
+
+        if (colorSubscription != null)
+            colorSubscription.unsubscribe();
     }
 }
